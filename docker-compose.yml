@@ -5,5 +5,5 @@ services:
     ports:
      - "3000:3000"
     volumes:
-     - "./downloads:/downloads"  # Mount local downloads folder to container
+     - "./downloads:/app/downloads"  # Mount local downloads folder to container
     restart: unless-stopped

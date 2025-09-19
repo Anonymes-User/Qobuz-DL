@@ -65,7 +65,7 @@ export const defaultSettings: SettingsProps = {
   zipName: '{artists} - {name}',
   trackName: '{artists} - {name}',
   serverSideDownloads: true,
-  serverDownloadPath: '/downloads',
+  serverDownloadPath: 'downloads',
   folderName: '{artists} - {name}'
 }
 

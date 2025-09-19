@@ -8,7 +8,7 @@ export async function GET() {
       outputQuality: (process.env.DEFAULT_OUTPUT_QUALITY || '27') as '27' | '7' | '6' | '5',
       outputCodec: (process.env.DEFAULT_OUTPUT_CODEC || 'FLAC') as 'FLAC' | 'WAV' | 'ALAC' | 'MP3' | 'AAC' | 'OPUS',
       bitrate: parseInt(process.env.DEFAULT_BITRATE || '320'),
-      serverDownloadPath: process.env.QOBUZ_DOWNLOAD_PATH || '/downloads',
+      serverDownloadPath: process.env.QOBUZ_DOWNLOAD_PATH || 'downloads',
       folderName: process.env.DEFAULT_FOLDER_NAME || '{artists} - {name}',
       trackName: process.env.DEFAULT_TRACK_NAME || '{artists} - {name}',
       zipName: process.env.DEFAULT_ZIP_NAME || '{artists} - {name}'

@@ -5,7 +5,7 @@ import z from 'zod'
 
 const saveParamsSchema = z.object({
   filename: z.string(),
-  output_path: z.string().default(process.env.QOBUZ_DOWNLOAD_PATH || '/downloads')
+  output_path: z.string().default(process.env.QOBUZ_DOWNLOAD_PATH || 'downloads')
 })
 
 export async function POST(request: NextRequest) {

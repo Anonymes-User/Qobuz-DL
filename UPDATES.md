@@ -191,7 +191,7 @@ volumes:
   - "./downloads:/downloads"  # or custom path from QOBUZ_DOWNLOAD_PATH
 environment:
   - ENABLE_SERVER_DOWNLOADS=true
-  - QOBUZ_DOWNLOAD_PATH=/downloads
+  - QOBUZ_DOWNLOAD_PATH=downloads
 ```
 
 ### Settings Integration

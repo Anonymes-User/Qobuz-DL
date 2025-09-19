@@ -289,7 +289,7 @@ export const createDownloadJob = async (
                 const formData = new FormData()
                 formData.append('file', blob, filename)
                 formData.append('filename', filename)
-                formData.append('output_path', `${process.env.QOBUZ_DOWNLOAD_PATH || '/downloads'}/${cleanFolderPath(formattedZipTitle)}`)
+                formData.append('output_path', `${process.env.QOBUZ_DOWNLOAD_PATH || 'downloads'}/${cleanFolderPath(formattedZipTitle)}`)
                 
                 const saveResponse = await fetch('/api/save-to-server', {
                   method: 'POST',
@@ -362,7 +362,7 @@ async function proceedDownload(objectURL: string, title: string, settings?: Sett
       const formData = new FormData()
       formData.append('file', blob, title)
       formData.append('filename', title)
-      formData.append('output_path', process.env.QOBUZ_DOWNLOAD_PATH || '/downloads')
+      formData.append('output_path', process.env.QOBUZ_DOWNLOAD_PATH || 'downloads')
       
       const saveResponse = await fetch('/api/save-to-server', {
         method: 'POST',

@@ -396,7 +396,7 @@ const SettingsForm = () => {
                       <div className='space-y-2'>
                         <p className='font-medium text-sm'>Server Download Path</p>
                         <Input
-                          placeholder='/downloads'
+                          placeholder='downloads'
                           value={settings.serverDownloadPath}
                           onChange={(e) => 
                             setSettings((prev) => ({ ...prev, serverDownloadPath: e.target.value }))
