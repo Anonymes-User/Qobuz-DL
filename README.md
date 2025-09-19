@@ -75,31 +75,6 @@ docker build -t qobuz-dl .
 docker-compose up -d
 ```
 
-The Docker setup includes:
-- Automatic volume mounting to `./downloads` directory for server-side downloads
-- Built-in FFmpeg support for audio processing
-- Environment variables for configuration
-
-#### Server-Side Downloads
-The Docker version supports server-side downloads, where files are saved directly to the host filesystem instead of being downloaded through the browser. This is useful for:
-
-- **Headless operation**: No need for browser interaction
-- **Large downloads**: Avoid browser download limitations
-- **Persistent storage**: Files remain on the server
-- **Network efficiency**: No need to transfer files to client
-
-To enable server-side downloads:
-1. Go to Settings in the web interface
-2. Enable "Server-Side Downloads"
-3. Set the download path (default: `/downloads`)
-4. Downloads will be saved to the `./downloads` directory on your host machine
-
-You can customize the download location by modifying the volume mount in `docker-compose.yml`:
-```yaml
-volumes:
- - "./your-custom-path:/downloads"
-```
-
 ### Setup .env (IMPORTANT)
 Before you can use Qobuz-DL, you need to change the .env file in the root directory. The default configuration will NOT work. QOBUZ_APP_ID and QOBUZ_SECRET must be set to the correct values. To find these you can use [this tool](https://github.com/QobuzDL/Qobuz-AppID-Secret-Tool).
 Additionally, in order to download files longer than 30 seconds, a valid Qobuz token is needed. This can be found in the localuser.token key of localstorage on the [official Qobuz website](https://play.qobuz.com/) for any paying members.
