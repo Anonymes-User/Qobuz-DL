@@ -5,6 +5,7 @@ export async function GET() {
     const serverConfig = {
       enableServerDownloads: process.env.ENABLE_SERVER_DOWNLOADS === 'true',
       serverSideDownloads: process.env.DEFAULT_SERVER_DOWNLOADS === 'true',
+      serverSideProcessing: process.env.DEFAULT_SERVER_PROCESSING === 'true',
       outputQuality: (process.env.DEFAULT_OUTPUT_QUALITY || '27') as '27' | '7' | '6' | '5',
       outputCodec: (process.env.DEFAULT_OUTPUT_CODEC || 'FLAC') as 'FLAC' | 'WAV' | 'ALAC' | 'MP3' | 'AAC' | 'OPUS',
       bitrate: parseInt(process.env.DEFAULT_BITRATE || '320'),

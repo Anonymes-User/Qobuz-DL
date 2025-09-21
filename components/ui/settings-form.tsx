@@ -443,6 +443,18 @@ const SettingsForm = () => {
                           Pattern used for album folder names when downloading to server.
                         </p>
                       </div>
+                      <div className='flex items-center gap-2'>
+                        <p className='font-medium text-sm'>Server-Side Processing</p>
+                        <Checkbox
+                          checked={settings.serverSideProcessing}
+                          onCheckedChange={(checked: boolean) => 
+                            setSettings((settings) => ({ ...settings, serverSideProcessing: checked }))
+                          }
+                        />
+                      </div>
+                      <p className='text-xs text-muted-foreground'>
+                        When enabled, all FFmpeg processing occurs on the server instead of in your browser. This prevents client-side memory issues but requires server resources.
+                      </p>
                     </div>
                   )}
                 </div>

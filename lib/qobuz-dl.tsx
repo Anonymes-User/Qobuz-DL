@@ -177,11 +177,19 @@ export const QOBUZ_TRACK_URL_REGEX = /https:\/\/(play|open)\.qobuz\.com\/track\/
 export const QOBUZ_ARTIST_URL_REGEX = /https:\/\/(play|open)\.qobuz\.com\/artist\/\d+/
 
 export function getAlbum(input: QobuzAlbum | QobuzTrack | QobuzArtist) {
+  if (!input) return null
   return ((input as QobuzAlbum).image ? input : (input as QobuzTrack).album) as QobuzAlbum
 }
 
 export function formatTitle(input: QobuzAlbum | QobuzTrack | QobuzArtist) {
-  return `${(input as QobuzAlbum | QobuzTrack).title ?? (input as QobuzArtist).name}${(input as QobuzAlbum | QobuzTrack).version ? ' (' + (input as QobuzAlbum | QobuzTrack).version + ')' : ''}`.trim()
+  if (!input) return 'Unknown'
+  try {
+    const title = (input as QobuzAlbum | QobuzTrack).title ?? (input as QobuzArtist).name ?? 'Unknown'
+    const version = (input as QobuzAlbum | QobuzTrack).version ? ' (' + (input as QobuzAlbum | QobuzTrack).version + ')' : ''
+    return `${title}${version}`.trim()
+  } catch (error) {
+    return 'Unknown'
+  }
 }
 
 export function getFullResImageUrl(input: QobuzAlbum | QobuzTrack) {
@@ -189,9 +197,16 @@ export function getFullResImageUrl(input: QobuzAlbum | QobuzTrack) {
 }
 
 export function formatArtists(input: QobuzAlbum | QobuzTrack, separator: string = ', ') {
-  return (getAlbum(input) as QobuzAlbum).artists && (getAlbum(input) as QobuzAlbum).artists.length > 0
-    ? (getAlbum(input) as QobuzAlbum).artists.map((artist) => artist.name).join(separator)
-    : (input as QobuzTrack).performer?.name || 'Various Artists'
+  if (!input) return 'Unknown Artist'
+  try {
+    const album = getAlbum(input)
+    if (!album) return 'Unknown Artist'
+    return album.artists && album.artists.length > 0
+      ? album.artists.map((artist) => artist.name || 'Unknown').join(separator)
+      : (input as QobuzTrack).performer?.name || 'Various Artists'
+  } catch (error) {
+    return 'Unknown Artist'
+  }
 }
 
 export function getRandomToken() {

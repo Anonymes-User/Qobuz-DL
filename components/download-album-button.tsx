@@ -48,10 +48,38 @@ const DownloadButton = React.forwardRef<HTMLButtonElement, DownloadAlbumButtonPr
       else onClose?.()
     })
     // If server downloads are globally enabled AND user has enabled them, show simple button without dropdown
-    console.log('DownloadButton - enableServerDownloads:', enableServerDownloads, 'settings.serverSideDownloads:', settings.serverSideDownloads)
+    console.log('DownloadButton - enableServerDownloads:', enableServerDownloads, 'settings.serverSideDownloads:', settings.serverSideDownloads, 'serverSideProcessing:', settings.serverSideProcessing)
     const shouldUseServerDownloads = enableServerDownloads && settings.serverSideDownloads
-    if (shouldUseServerDownloads) {
-      console.log('DownloadButton - Using server download path!')
+    const shouldUseServerProcessing = shouldUseServerDownloads && settings.serverSideProcessing
+    if (shouldUseServerProcessing) {
+      console.log('DownloadButton - Using server-side processing!')
+      return (
+        <Button 
+          className={className} 
+          ref={ref} 
+          variant={variant} 
+          size={size} 
+          asChild={asChild} 
+          onClick={() => {
+            console.log('DownloadButton - Server processing clicked, settings:', settings)
+            createDownloadJob(
+              result,
+              setStatusBar,
+              ffmpegState,
+              settings,
+              toast,
+              fetchedAlbumData,
+              setFetchedAlbumData
+            )
+            toast({ title: `Added '${formatTitle(result)}'`, description: 'The album has been added to the server processing queue' })
+          }}
+          {...props}
+        >
+          <DownloadIcon className='!size-4' />
+        </Button>
+      )
+    } else if (shouldUseServerDownloads) {
+      console.log('DownloadButton - Using legacy server download!')
       return (
         <Button 
           className={className} 

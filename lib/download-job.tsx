@@ -11,7 +11,8 @@ import {
   getFullResImageUrl,
   QobuzAlbum,
   QobuzArtistResults,
-  QobuzTrack
+  QobuzTrack,
+  getFullAlbumInfo
 } from './qobuz-dl'
 import { SettingsProps } from './settings-provider'
 import { StatusBarProps } from '@/components/status-bar/status-bar'
@@ -43,6 +44,42 @@ export const createDownloadJob = async (
 ) => {
   if ((result as QobuzTrack).album) {
     const formattedTitle = formatCustomTitle(settings.trackName, result as QobuzTrack)
+    const serverDownloadsEnabled = await isServerDownloadsEnabled();
+    const shouldUseServerDownloads = serverDownloadsEnabled && settings.serverSideDownloads;
+    const shouldUseServerProcessing = shouldUseServerDownloads && settings.serverSideProcessing;
+    if (shouldUseServerProcessing) {
+      await createJob(setStatusBar, formattedTitle, Disc3Icon, async () => {
+        return new Promise(async (resolve) => {
+          setStatusBar((prev) => ({ ...prev, description: 'Processing on server...', progress: 50 }));
+          const serverPayload = {
+            track: result,
+            settings,
+            formattedTitle,
+          };
+          const response = await fetch('/api/server-download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(serverPayload)
+          });
+          if (response.ok) {
+            setStatusBar((prev) => ({ ...prev, progress: 100 }));
+            toast({
+              title: 'Track Download Complete',
+              description: `Successfully processed and saved "${formattedTitle}" on server.`
+            });
+          } else {
+            const errorText = await response.text();
+            toast({
+              title: 'Server Download Error',
+              description: errorText
+            });
+          }
+          resolve();
+        });
+      });
+      return;
+    }
+    // Client-side processing for tracks
     await createJob(setStatusBar, formattedTitle, Disc3Icon, async () => {
       return new Promise(async (resolve) => {
         try {
@@ -145,14 +182,47 @@ export const createDownloadJob = async (
     // Check if server downloads are globally enabled before using user preference
     const serverDownloadsEnabled = await isServerDownloadsEnabled()
     const shouldUseServerDownloads = serverDownloadsEnabled && settings.serverSideDownloads
+    const shouldUseServerProcessing = shouldUseServerDownloads && settings.serverSideProcessing
     
     // For server downloads, use folderName instead of zipName since we're creating folders, not zips
     const folderSetting = shouldUseServerDownloads ? settings.folderName : settings.zipName
-    console.log('Album download - serverDownloadsEnabled:', serverDownloadsEnabled, 'userPreference:', settings.serverSideDownloads, 'shouldUse:', shouldUseServerDownloads)
+    console.log('Album download - serverDownloadsEnabled:', serverDownloadsEnabled, 'userPreference:', settings.serverSideDownloads, 'shouldUse:', shouldUseServerDownloads, 'processing:', shouldUseServerProcessing)
     console.log('Album download - using setting:', folderSetting)
     const formattedZipTitle = formatCustomTitle(folderSetting, result as QobuzAlbum)
     console.log('Album download - formattedZipTitle:', formattedZipTitle)
 
+    if (shouldUseServerProcessing) {
+      await createJob(setStatusBar, formattedZipTitle, DiscAlbumIcon, async () => {
+        return new Promise(async (resolve) => {
+          setStatusBar((prev) => ({ ...prev, description: 'Processing on server...', progress: 50 }));
+          const serverPayload = {
+            album_id: result.id,
+            settings
+          };
+          const response = await fetch('/api/server-download', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(serverPayload)
+          });
+          if (response.ok) {
+            setStatusBar((prev) => ({ ...prev, progress: 100 }));
+            toast({
+              title: 'Album Download Complete',
+              description: `Successfully processed and saved "${formattedZipTitle}" on server.`
+            });
+          } else {
+            const errorText = await response.text();
+            toast({
+              title: 'Server Download Error',
+              description: errorText
+            });
+          }
+          resolve();
+        });
+      });
+      return;
+    }
+    // Client-side processing for albums
     await createJob(setStatusBar, formattedZipTitle, DiscAlbumIcon, async () => {
       return new Promise(async (resolve) => {
         try {

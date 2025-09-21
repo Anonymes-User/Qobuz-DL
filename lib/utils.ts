@@ -1,4 +1,4 @@
-import { formatArtists, formatDuration, formatTitle, type QobuzAlbum, type QobuzTrack } from './qobuz-dl'
+import { formatArtists, formatDuration, formatTitle, getAlbum, type QobuzAlbum, type QobuzTrack } from './qobuz-dl'
 import { twMerge } from 'tailwind-merge'
 import { type ClassValue, clsx } from 'clsx'
 
@@ -22,6 +22,9 @@ export const formatBytes = (bytes: number): string => {
 }
 
 export const cleanFileName = (filename: string) => {
+  if (!filename || typeof filename !== 'string') {
+    return 'unknown_file'
+  }
   const bannedChars = ['/', '\\', '?', ':', '*', '"', '<', '>', '|']
   for (const char in bannedChars) {
     filename = filename.replaceAll(bannedChars[char], '_')
@@ -101,9 +104,18 @@ export async function resizeImage(imageURL: string, maxSize: number, quality: nu
 }
 
 export function formatCustomTitle(titleSetting: string, result: QobuzAlbum | QobuzTrack): string {
-  return titleSetting
-    .replaceAll('{artists}', formatArtists(result))
-    .replaceAll('{name}', formatTitle(result))
-    .replaceAll('{year}', String(new Date(result.released_at * 1000).getFullYear()))
-    .replaceAll('{duration}', String(formatDuration(result.duration)))
+  if (!titleSetting) titleSetting = '{artists} - {name}'
+  if (!result) return 'Unknown'
+  try {
+    return titleSetting
+      .replaceAll('{artists}', formatArtists(result) || 'Unknown Artist')
+      .replaceAll('{artist}', formatArtists(result) || 'Unknown Artist')
+      .replaceAll('{name}', formatTitle(result) || 'Unknown Title')
+      .replaceAll('{album}', getAlbum(result)?.title || 'Unknown Album')
+      .replaceAll('{year}', result.released_at ? String(new Date(result.released_at * 1000).getFullYear()) : 'Unknown Year')
+      .replaceAll('{duration}', result.duration ? String(formatDuration(result.duration)) : '0:00')
+  } catch (error) {
+    console.error('Error formatting title:', error)
+    return 'Unknown'
+  }
 }
