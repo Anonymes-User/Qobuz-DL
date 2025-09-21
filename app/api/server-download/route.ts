@@ -15,66 +15,94 @@ interface ServerDownloadPayload {
   formattedTitle?: string
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const payload: ServerDownloadPayload = await request.json()
-    const { track, album_id, settings, formattedTitle } = payload
-
-    console.log('Server download payload:', { track: !!track, album_id, formattedTitle })
-
-    const downloadPath = settings.serverDownloadPath || 'downloads'
-    const fullPath = path.resolve(downloadPath)
-
-    // Ensure directory exists
-    if (!fs.existsSync(fullPath)) {
-      fs.mkdirSync(fullPath, { recursive: true })
-      console.log('Created download path:', fullPath)
-    }
-
-    if (track) {
-      console.log('Processing track:', track.title)
-      try {
-        await processTrack(track, settings, formattedTitle || 'Unknown', fullPath)
-        console.log('Track processed')
-      } catch (error) {
-        console.error('Error processing track:', track.id, error)
-        throw error
-      }
-    } else if (album_id) {
-      console.log('Fetching album data for id:', album_id)
-      const albumData = await getAlbumInfo(album_id)
-      console.log('Fetched album:', albumData.title, 'tracks:', albumData.tracks.items.length)
-      const folderTitle = formatCustomTitle(settings.folderName, albumData)
-      console.log('Formatted folder title:', folderTitle)
-      const albumFolder = path.join(fullPath, cleanFolderPath(folderTitle))
-      if (!fs.existsSync(albumFolder)) {
-        fs.mkdirSync(albumFolder, { recursive: true })
-        console.log('Created album folder:', albumFolder)
-      }
-      for (const track of albumData.tracks.items) {
-        if (track && track.streamable) {
-          try {
-            console.log('Processing album track:', track.title)
-            track.album = albumData // Ensure track has album data for formatting
-            const trackTitle = formatCustomTitle(settings.trackName, track)
-            await processTrack(track, settings, trackTitle, albumFolder, albumData)
-          } catch (error) {
-            console.error('Error processing track:', track.id, error)
-          }
-        }
-      }
-      console.log('Album processed')
-    }
-
-    console.log('Server download completed successfully')
-    return NextResponse.json({ success: true, message: 'Download completed' })
-  } catch (error: any) {
-    console.error('Server download error:', error)
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
-  }
+interface ProgressEvent {
+  type: 'progress' | 'complete' | 'error'
+  message?: string
+  progress?: number
 }
 
-async function processTrack(track: QobuzTrack, settings: SettingsProps, title: string, outputDir: string, albumData?: FetchedQobuzAlbum) {
+export async function POST(request: NextRequest) {
+  const payload: ServerDownloadPayload = await request.json()
+  const { track, album_id, settings, formattedTitle } = payload
+
+  console.log('Server download payload:', { track: !!track, album_id, formattedTitle })
+
+  const downloadPath = settings.serverDownloadPath || 'downloads'
+  const fullPath = path.resolve(downloadPath)
+
+  // Ensure directory exists
+  if (!fs.existsSync(fullPath)) {
+    fs.mkdirSync(fullPath, { recursive: true })
+    console.log('Created download path:', fullPath)
+  }
+
+  const encoder = new TextEncoder()
+  let progress = 0
+
+  const sendProgress = (controller: ReadableStreamDefaultController, message: string, prog?: number) => {
+    if (prog !== undefined) progress = prog
+    const event = `data: ${JSON.stringify({type: 'progress', message, progress})}\n\n`
+    controller.enqueue(encoder.encode(event))
+  }
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        sendProgress(controller, 'Starting download', 0)
+
+        if (track) {
+          sendProgress(controller, 'Processing track', 10)
+          await processTrack(track, settings, formattedTitle || 'Unknown', fullPath, undefined, (msg, prog) => sendProgress(controller, msg, prog))
+          sendProgress(controller, 'Track completed', 100)
+        } else if (album_id) {
+          sendProgress(controller, 'Fetching album data', 5)
+          const albumData = await getAlbumInfo(album_id)
+          const totalTracks = albumData.tracks.items.length
+          sendProgress(controller, `Fetched album: ${albumData.title} (${totalTracks} tracks)`, 10)
+
+          const folderTitle = formatCustomTitle(settings.folderName, albumData)
+          const albumFolder = path.join(fullPath, cleanFolderPath(folderTitle))
+          if (!fs.existsSync(albumFolder)) {
+            fs.mkdirSync(albumFolder, { recursive: true })
+          }
+
+          for (let i = 0; i < albumData.tracks.items.length; i++) {
+            const track = albumData.tracks.items[i]
+            if (track && track.streamable) {
+              const trackProgress = 10 + (i / totalTracks) * 80
+              sendProgress(controller, `Processing track ${i+1}/${totalTracks}: ${track.title}`, trackProgress)
+              track.album = albumData
+              const trackTitle = formatCustomTitle(settings.trackName, track)
+              await processTrack(track, settings, trackTitle, albumFolder, albumData, (msg, prog) => {
+                // For per-track sub-progress, adjust the overall progress
+                const subProgress = prog ? prog / 100 * (80 / totalTracks) : 0
+                sendProgress(controller, msg, 10 + (i / totalTracks) * 80 + subProgress)
+              })
+            }
+          }
+          sendProgress(controller, 'Album completed', 100)
+        }
+
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({type: 'complete'})}\n\n`))
+      } catch (error: any) {
+        console.error('Server download error:', error)
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({type: 'error', message: error.message})}\n\n`))
+      } finally {
+        controller.close()
+      }
+    }
+  })
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    },
+  })
+}
+
+async function processTrack(track: QobuzTrack, settings: SettingsProps, title: string, outputDir: string, albumData?: FetchedQobuzAlbum, sendProgress?: (msg: string, prog?: number) => void) {
   try {
     if (!title || title.trim() === '') {
       title = `Track ${track.track_number || 'Unknown'}`
@@ -93,16 +121,19 @@ async function processTrack(track: QobuzTrack, settings: SettingsProps, title: s
 
     // Get download URL
     const trackUrl = await getDownloadURL(track.id, settings.outputQuality)
+    sendProgress?.('Downloading audio', 20)
     console.log('Got URL, downloading...')
 
     // Download audio
     const audioResponse = await axios.get(trackUrl, { responseType: 'arraybuffer' })
     const audioBuffer = Buffer.from(audioResponse.data)
+    sendProgress?.('Audio downloaded', 40)
     console.log('Downloaded, size:', audioBuffer.length)
 
     // Save raw audio
     const rawPath = path.join(os.tmpdir(), `raw_${track.id}.flac`)
     fs.writeFileSync(rawPath, audioBuffer)
+    sendProgress?.('Saved to temp', 50)
     console.log('Saved raw file to temp:', rawPath)
 
     // Apply FFmpeg processing if needed
@@ -113,10 +144,13 @@ async function processTrack(track: QobuzTrack, settings: SettingsProps, title: s
         (settings.bitrate === 320 && settings.outputCodec === 'MP3')
       )
     ) {
+      sendProgress?.('Applying FFmpeg processing', 60)
       console.log('Applying FFmpeg...')
-      await applyFFmpeg(rawPath, settings, finalOutputDir, title, track, albumData)
+      await applyFFmpeg(rawPath, settings, finalOutputDir, title, track, albumData, sendProgress)
+      sendProgress?.('FFmpeg processing complete', 90)
       console.log('FFmpeg applied')
     } else {
+      sendProgress?.('No processing needed', 90)
       console.log('No FFmpeg needed')
     }
   } catch (error) {
@@ -125,7 +159,7 @@ async function processTrack(track: QobuzTrack, settings: SettingsProps, title: s
   }
 }
 
-async function applyFFmpeg(inputPath: string, settings: SettingsProps, outputDir: string, title: string, track: QobuzTrack, albumData?: FetchedQobuzAlbum) {
+async function applyFFmpeg(inputPath: string, settings: SettingsProps, outputDir: string, title: string, track: QobuzTrack, albumData?: FetchedQobuzAlbum, sendProgress?: (msg: string, prog?: number) => void) {
   const outputPath = path.join(outputDir, `${cleanFileName(title)}.${settings.outputCodec.toLowerCase()}`)
 
   const skipRencode =
@@ -145,7 +179,7 @@ async function applyFFmpeg(inputPath: string, settings: SettingsProps, outputDir
 
   // Step 1: Re-encode if necessary
   if (!skipRencode) {
-    const reencodeArgs = ['-y', '-i', inputPath]
+    const reencodeArgs = ['-loglevel', 'quiet', '-y', '-i', inputPath]
     reencodeArgs.push('-c:a')
     if (settings.outputCodec === 'FLAC') reencodeArgs.push('flac')
     else if (settings.outputCodec === 'WAV') reencodeArgs.push('pcm_s16le')
@@ -192,7 +226,7 @@ async function applyFFmpeg(inputPath: string, settings: SettingsProps, outputDir
     const metadataPath = path.join(outputDir, 'metadata.txt')
     fs.writeFileSync(metadataPath, metadata)
 
-    const metadataArgs = ['-y', '-i', currentInput, '-i', metadataPath, '-map_metadata', '1', '-codec', 'copy', temp2]
+    const metadataArgs = ['-loglevel', 'quiet', '-y', '-i', currentInput, '-i', metadataPath, '-map_metadata', '1', '-codec', 'copy', temp2]
     await runFFmpeg(metadataArgs)
     currentInput = temp2
   }
@@ -205,7 +239,7 @@ async function applyFFmpeg(inputPath: string, settings: SettingsProps, outputDir
       const albumArtPath = path.join(outputDir, 'albumArt.jpg')
       fs.writeFileSync(albumArtPath, Buffer.from(albumArtResponse.data))
 
-      const artArgs = ['-y', '-i', currentInput, '-i', albumArtPath, '-c', 'copy', '-map', '0', '-map', '1', '-disposition:v:0', 'attached_pic', outputPath]
+      const artArgs = ['-loglevel', 'quiet', '-y', '-i', currentInput, '-i', albumArtPath, '-c', 'copy', '-map', '0', '-map', '1', '-disposition:v:0', 'attached_pic', outputPath]
       await runFFmpeg(artArgs)
     } catch (e) {
       console.warn('Failed to download album art:', e)

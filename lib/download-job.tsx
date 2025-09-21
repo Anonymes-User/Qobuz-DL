@@ -50,7 +50,7 @@ export const createDownloadJob = async (
     if (shouldUseServerProcessing) {
       await createJob(setStatusBar, formattedTitle, Disc3Icon, async () => {
         return new Promise(async (resolve) => {
-          setStatusBar((prev) => ({ ...prev, description: 'Processing on server...', progress: 50 }));
+          setStatusBar((prev) => ({ ...prev, description: 'Sending request to server...', progress: 10, title: formattedTitle }));
           const serverPayload = {
             track: result,
             settings,
@@ -61,20 +61,51 @@ export const createDownloadJob = async (
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(serverPayload)
           });
-          if (response.ok) {
-            setStatusBar((prev) => ({ ...prev, progress: 100 }));
-            toast({
-              title: 'Track Download Complete',
-              description: `Successfully processed and saved "${formattedTitle}" on server.`
-            });
-          } else {
+          if (!response.ok) {
             const errorText = await response.text();
             toast({
               title: 'Server Download Error',
               description: errorText
             });
+            resolve();
+            return;
           }
-          resolve();
+          const reader = response.body!.getReader();
+          const decoder = new TextDecoder();
+          let done = false;
+          while (!done) {
+            const { value, done: readerDone } = await reader.read();
+            done = readerDone;
+            if (value) {
+              const chunk = decoder.decode(value, { stream: !done });
+              const lines = chunk.split('\n');
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  try {
+                    const data = JSON.parse(line.slice(6));
+                    if (data.type === 'progress') {
+                      setStatusBar((prev) => ({ ...prev, description: data.message, progress: data.progress }));
+                    } else if (data.type === 'complete') {
+                      setStatusBar((prev) => ({ ...prev, progress: 100 }));
+                      toast({
+                        title: 'Track Download Complete',
+                        description: `Successfully processed and saved "${formattedTitle}" on server.`
+                      });
+                      resolve();
+                    } else if (data.type === 'error') {
+                      toast({
+                        title: 'Server Download Error',
+                        description: data.message
+                      });
+                      resolve();
+                    }
+                  } catch (e) {
+                    // Ignore parse errors
+                  }
+                }
+              }
+            }
+          }
         });
       });
       return;
@@ -194,7 +225,7 @@ export const createDownloadJob = async (
     if (shouldUseServerProcessing) {
       await createJob(setStatusBar, formattedZipTitle, DiscAlbumIcon, async () => {
         return new Promise(async (resolve) => {
-          setStatusBar((prev) => ({ ...prev, description: 'Processing on server...', progress: 50 }));
+          setStatusBar((prev) => ({ ...prev, description: 'Sending request to server...', progress: 10, title: formattedZipTitle }));
           const serverPayload = {
             album_id: result.id,
             settings
@@ -204,20 +235,51 @@ export const createDownloadJob = async (
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(serverPayload)
           });
-          if (response.ok) {
-            setStatusBar((prev) => ({ ...prev, progress: 100 }));
-            toast({
-              title: 'Album Download Complete',
-              description: `Successfully processed and saved "${formattedZipTitle}" on server.`
-            });
-          } else {
+          if (!response.ok) {
             const errorText = await response.text();
             toast({
               title: 'Server Download Error',
               description: errorText
             });
+            resolve();
+            return;
           }
-          resolve();
+          const reader = response.body!.getReader();
+          const decoder = new TextDecoder();
+          let done = false;
+          while (!done) {
+            const { value, done: readerDone } = await reader.read();
+            done = readerDone;
+            if (value) {
+              const chunk = decoder.decode(value, { stream: !done });
+              const lines = chunk.split('\n');
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  try {
+                    const data = JSON.parse(line.slice(6));
+                    if (data.type === 'progress') {
+                      setStatusBar((prev) => ({ ...prev, description: data.message, progress: data.progress }));
+                    } else if (data.type === 'complete') {
+                      setStatusBar((prev) => ({ ...prev, progress: 100 }));
+                      toast({
+                        title: 'Album Download Complete',
+                        description: `Successfully processed and saved "${formattedZipTitle}" on server.`
+                      });
+                      resolve();
+                    } else if (data.type === 'error') {
+                      toast({
+                        title: 'Server Download Error',
+                        description: data.message
+                      });
+                      resolve();
+                    }
+                  } catch (e) {
+                    // Ignore parse errors
+                  }
+                }
+              }
+            }
+          }
         });
       });
       return;
