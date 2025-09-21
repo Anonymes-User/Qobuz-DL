@@ -2,6 +2,9 @@ FROM node:alpine
 
 WORKDIR /app
 
+# Install FFmpeg for server-side processing
+RUN apk add --no-cache ffmpeg
+
 COPY . .
 
 RUN npm install
