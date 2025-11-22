@@ -43,6 +43,7 @@ export const createDownloadJob = async (
   setFetchedAlbumData?: React.Dispatch<React.SetStateAction<FetchedQobuzAlbum | null>>
 ) => {
   if ((result as QobuzTrack).album) {
+    console.log('Creating download job for track:', result)
     const formattedTitle = formatCustomTitle(settings.trackName, result as QobuzTrack)
     const serverDownloadsEnabled = await isServerDownloadsEnabled();
     const shouldUseServerDownloads = serverDownloadsEnabled && settings.serverSideDownloads;
@@ -210,6 +211,7 @@ export const createDownloadJob = async (
       })
     })
   } else {
+    console.log('Album download')
     // Check if server downloads are globally enabled before using user preference
     const serverDownloadsEnabled = await isServerDownloadsEnabled()
     const shouldUseServerDownloads = serverDownloadsEnabled && settings.serverSideDownloads
