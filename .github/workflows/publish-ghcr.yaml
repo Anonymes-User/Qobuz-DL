@@ -10,7 +10,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Login to GitHub Container Registry
         run: |
-          docker login -u ${{ github.GITHUB_REPOSITORY_OWNER }} -p ${{ secrets.GH_PAT }} 
+          docker login -u ${{ context.repo.owner }} -p ${{ secrets.GH_PAT }} 
           docker build . -t ghcr.io/Anonymes-User/${{ github.repository }}:latest
           docker push ghcr.io/${{ github.repository }}:latest
       
